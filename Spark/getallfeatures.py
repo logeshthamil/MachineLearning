@@ -101,14 +101,14 @@ def extract_cluster_tofile(features_file=None):
         weekday = weekday.values()
         timedata = timedata.values()
         weekday = [float(i) / sum(weekday) for i in weekday]
-        timedata = [float(i) / sum(timedata) for i in timedata]
+        # timedata = [float(i) / sum(timedata) for i in timedata]
 
         ## browser info
         for visits in document.get("lastVisits"):
             b = visits.get("browser").split('(')[1].split(';')[0]
             devices[b] += 1
         devices = devices.values()
-        devices = [float(i) / sum(devices) for i in devices]
+        # devices = [float(i) / sum(devices) for i in devices]
 
         if age is not None:
             towrite = str(age) + ',' + ','.join(map(str, devices)) + ',' + ','.join(map(str, timedata)) + '\n'
@@ -136,7 +136,7 @@ svm_poly = svm.SVR(kernel='poly', degree=3)
 svm_rbf = svm.SVR(kernel='rbf', degree=10)
 n_folds = 5
 
-regres = random_forest
+regres = svm_poly
 kf = KFold(n_splits=n_folds)
 original = []
 predicted = []
