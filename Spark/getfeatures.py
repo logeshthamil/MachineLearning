@@ -14,6 +14,7 @@ def extract_cluster_tofile(features_file=None):
     if not os.path.exists(os.path.dirname(features_file)):
         os.mkdir(os.path.dirname(features_file))
     featuresfile = io.open(file=features_file, mode='w')
+    allbrowsers = {}
     users_with_gender = users_collection.find({"gender": {"$ne": ""}})
     for document in users_with_gender:
         gender = document.get("gender")
@@ -106,6 +107,10 @@ def extract_cluster_tofile(features_file=None):
 
         ## browser info
         for visits in document.get("lastVisits"):
+            if visits.get("browser") not in allbrowsers:
+                allbrowsers[visits.get("browser")] = 1
+            elif visits.get("browser") in allbrowsers:
+                allbrowsers[visits.get("browser")] += 1
             b = visits.get("browser").split('(')[1].split(';')[0]
             if "Windows NT" in b:
                 devices["Windows NT"] += 1
@@ -114,18 +119,18 @@ def extract_cluster_tofile(features_file=None):
         devices = devices.values()
         devices = [float(i) / sum(devices) for i in devices]
 
-        usabletimestamp = 0
+        timespentinmin = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0,
+                          14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0, 20: 0, 21: 0, 22: 0, 23: 0}
         if len(timestamps) > 0:
-            timespentinmin = []
             old = timestamps[0]
             for t in timestamps[1:]:
                 totalsec = (t - old).total_seconds()
-                if (totalsec < (10*60)) and (totalsec > 10):
-                    timespentinmin.append(int(totalsec/60)+1)
+                if (totalsec < (10 * 60)) and (totalsec > 10):
+                    timespentinmin[old.hour] += (totalsec / 60.0)
                 old = t
-            if len(timespentinmin) > 0:
-                usabletimestamp = numpy.average(timespentinmin).tolist()
-                # usabletimestamp = max(timespentinmin)
+        timespentinmin = timespentinmin.values()
+        # if any(timespentinmin):
+        #     timespentinmin = [float(i) / sum(timespentinmin) for i in timespentinmin]
 
         # towrite = gender + ',' + ','.join(map(str, weights1)) + ',' + ','.join(map(str, weights2)) + ',' + ','.join(
         #     map(str, weekday)) + ',' + ','.join(map(str, timedata)) + '\n'
@@ -133,74 +138,74 @@ def extract_cluster_tofile(features_file=None):
         towrite = gender + ',' + ','.join(map(str, weekday)) + '\n'
         # towrite = gender + ',' + str(list(devices).index(max(devices))) + ',' + str(list(timedataweekday).index(max(timedataweekday))) + '\n'
         if len(document.get("lastVisits")) > 5:
-            towrite = gender + ',' + ','.join(map(str, weights1)) + ',' + ','.join(
-                map(str, timedataweekday)) + ',' + ','.join(map(str, timedataweekend)) + ',' + ','.join(
-                map(str, devices)) + '\n'
+            towrite = gender + ',' + ','.join(map(str, weights1)) + ',' + ','.join(map(str, devices)) + ',' + ','.join(map(str, timespentinmin)) + '\n'
             featuresfile.write(towrite)
         # towrite = gender + ',' + ','.join(map(str, weights1)) + ',' + ','.join(map(str, devices)) + '\n'
         # featuresfile.write(towrite)
     featuresfile.close()
+    for key, value in allbrowsers.items():
+        print(key, " --> ", value)
 
 
 features_file = "/tmp/rtleditus/genderpredictionfeatures2.dat"
-# extract_cluster_tofile(features_file=features_file)
-featuresmat = numpy.loadtxt(fname=features_file, delimiter=',', dtype=str)
-featuresmat[featuresmat == 'nan'] = '0.0'
-gender = featuresmat[:, 0]
-gender[gender == 'm'] = 1
-gender[gender == 'f'] = 0
-feature = featuresmat[:, 1:]
-featurem = feature[~(feature == '0.0')[:].all(1)]
-gender = gender[~(feature == '0.0')[:].all(1)]
-featurem = featurem.astype(float)
-gender = gender.astype(float)
-
-from sklearn import ensemble
-from sklearn.metrics import confusion_matrix
-from sklearn.model_selection import KFold
-from sklearn.svm import SVC, LinearSVC
-
-
-n = []
-accuracy = []
-for nfeatures in range(1, len(featurem[0])+1, 5):
-    n.append(nfeatures)
-    n_folds = 5
-    clf = ensemble.GradientBoostingClassifier(n_estimators=100)
-    # clf = SVC()
-    # clf = LinearSVC()
-    print(featurem.shape, gender.shape)
-    from sklearn.feature_selection import RFE
-    rfe = RFE(clf, n_features_to_select=nfeatures)
-    rfe = rfe.fit(featurem, gender)
-    columnind = []
-    print(rfe.ranking_)
-    for i, s in enumerate(rfe.ranking_):
-        if s != 1:
-            columnind.append(i)
-    # print(rfe.support_)
-    # print(columnind)
-    # print(rfe.ranking_)
-    # print(rfe.score(featurem[3000:], gender[3000:]))
-    featuremnew = numpy.delete(featurem, columnind, axis=1)
-
-    kf = KFold(n_splits=n_folds)
-    original = []
-    predicted = []
-    for train_index, test_index in kf.split(featuremnew, gender):
-        X_train, X_test = featuremnew[train_index], featuremnew[test_index]
-        y_train, y_test = gender[train_index], gender[test_index]
-        clf.fit(X_train, y_train)
-        original = numpy.concatenate((original, y_test))
-        predicted = numpy.concatenate((predicted, clf.predict(X_test)))
-
-    tn, fp, fn, tp = confusion_matrix(original, predicted).ravel()
-    print(confusion_matrix(original, predicted))
-    print("Accuracy: ", (tn+tp)/(tn+fp+fn+tp))
-    accuracy.append((tn+tp)/(tn+fp+fn+tp))
-import matplotlib.pyplot as pyplot
-pyplot.plot(n, accuracy)
-pyplot.show()
+extract_cluster_tofile(features_file=features_file)
+# featuresmat = numpy.loadtxt(fname=features_file, delimiter=',', dtype=str)
+# featuresmat[featuresmat == 'nan'] = '0.0'
+# gender = featuresmat[:, 0]
+# gender[gender == 'm'] = 1
+# gender[gender == 'f'] = 0
+# feature = featuresmat[:, 1:]
+# featurem = feature[~(feature == '0.0')[:].all(1)]
+# gender = gender[~(feature == '0.0')[:].all(1)]
+# featurem = featurem.astype(float)
+# gender = gender.astype(float)
+#
+# from sklearn import ensemble
+# from sklearn.metrics import confusion_matrix
+# from sklearn.model_selection import KFold
+# from sklearn.svm import SVC, LinearSVC
+#
+#
+# n = []
+# accuracy = []
+# for nfeatures in range(10, len(featurem[0])+1, 2):
+#     n.append(nfeatures)
+#     n_folds = 5
+#     # clf = ensemble.GradientBoostingClassifier(n_estimators=100)
+#     # clf = SVC()
+#     clf = LinearSVC()
+#     print(featurem.shape, gender.shape)
+#     from sklearn.feature_selection import RFE
+#     rfe = RFE(clf, n_features_to_select=nfeatures)
+#     rfe = rfe.fit(featurem, gender)
+#     columnind = []
+#     print(rfe.ranking_)
+#     for i, s in enumerate(rfe.ranking_):
+#         if s != 1:
+#             columnind.append(i)
+#     # print(rfe.support_)
+#     # print(columnind)
+#     # print(rfe.ranking_)
+#     # print(rfe.score(featurem[3000:], gender[3000:]))
+#     featuremnew = numpy.delete(featurem, columnind, axis=1)
+#
+#     kf = KFold(n_splits=n_folds)
+#     original = []
+#     predicted = []
+#     for train_index, test_index in kf.split(featuremnew, gender):
+#         X_train, X_test = featuremnew[train_index], featuremnew[test_index]
+#         y_train, y_test = gender[train_index], gender[test_index]
+#         clf.fit(X_train, y_train)
+#         original = numpy.concatenate((original, y_test))
+#         predicted = numpy.concatenate((predicted, clf.predict(X_test)))
+#
+#     tn, fp, fn, tp = confusion_matrix(original, predicted).ravel()
+#     print(confusion_matrix(original, predicted))
+#     print("Accuracy: ", (tn+tp)/(tn+fp+fn+tp))
+#     accuracy.append((tn+tp)/(tn+fp+fn+tp))
+# import matplotlib.pyplot as pyplot
+# pyplot.plot(n, accuracy)
+# pyplot.show()
 
 # # pandas dataframe
 # import pandas as pd
