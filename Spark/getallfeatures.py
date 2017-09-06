@@ -47,7 +47,8 @@ def extract_cluster_tofile(features_file=None):
         year = document.get("birthYear")
         age = getagefromyear(year)
         clusters = document.get("clusters")
-        clusterscount = len(clusters)
+        # clusterscount = len(clusters)
+        clusterscount = 0
         weights1 = []
         weights2 = []
         timestamps = []
@@ -108,9 +109,11 @@ def extract_cluster_tofile(features_file=None):
         ## browser info
         for visits in document.get("lastVisits"):
             b = visits.get("browser").split('(')[1].split(';')[0]
-            devices[b] += 1
+            if b in devices.keys():
+                devices[b] += 1
         devices = devices.values()
-        devices = [float(i) / sum(devices) for i in devices]
+        if any(devices):
+            devices = [float(i) / sum(devices) for i in devices]
 
         timespentinmin = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0,
                           14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0, 20: 0, 21: 0, 22: 0, 23: 0}
@@ -161,7 +164,7 @@ random.shuffle(c)
 featurem, age = zip(*c)
 import matplotlib.pyplot as pyplot
 pyplot.hist(age, bins=range(1, 81))
-# pyplot.show()
+pyplot.show()
 featurem = numpy.asarray(featurem)
 age = numpy.asarray(age)
 
@@ -187,19 +190,61 @@ for train_index, test_index in kf.split(featurem, age):
 
 pyplot.hist(predicted, bins=range(1, 81))
 pyplot.show()
-# for p,o in zip(predicted, original):
-#     print(p, ' -> ', o)
-## Plot outputs
-import matplotlib.pyplot as plt
-fig, ax = plt.subplots()
-ax.scatter(original, predicted, edgecolors=(0, 0, 0))
-ax.plot([10, 80], [10, 80], 'k--', lw=4)
-ax.set_xlabel('Measured')
-ax.set_ylabel('Predicted')
-plt.show()
-
-from sklearn.metrics import mean_absolute_error
-print("Mean Squared Error", mean_absolute_error(original, predicted))
+# af = {}
+# for a, f in zip(age, featurem):
+#     if a not in af.keys():
+#         af[a] = []
+#     af[a].append(f.tolist())
+# mfeaturem = []
+# mage = []
+# for k, v in af.items():
+#     for mv in v[:50]:
+#         mfeaturem.append(mv)
+#         mage.append(k)
+# c = list(zip(mfeaturem, mage))
+# random.shuffle(c)
+# featurem, age = zip(*c)
+# import matplotlib.pyplot as pyplot
+# pyplot.hist(age, bins=range(1, 81))
+# # pyplot.show()
+# featurem = numpy.asarray(featurem)
+# age = numpy.asarray(age)
+#
+# from sklearn import svm, ensemble
+# from sklearn.model_selection import KFold
+# random_forest = ensemble.RandomForestRegressor(n_estimators=100)
+# gradient_boost = ensemble.GradientBoostingRegressor(n_estimators=1000)
+# svm_ = svm.SVR(kernel='linear')
+# svm_poly = svm.SVR(kernel='poly', degree=3)
+# svm_rbf = svm.SVR(kernel='rbf', degree=5)
+# n_folds = 5
+#
+# regres = gradient_boost
+# kf = KFold(n_splits=n_folds)
+# original = []
+# predicted = []
+# for train_index, test_index in kf.split(featurem, age):
+#     X_train, X_test = featurem[train_index], featurem[test_index]
+#     y_train, y_test = age[train_index], age[test_index]
+#     regres.fit(X_train, y_train)
+#     original = numpy.concatenate((original, y_test))
+#     predicted = numpy.concatenate((predicted, regres.predict(X_test)))
+#
+# pyplot.hist(predicted, bins=range(1, 81))
+# pyplot.show()
+# # for p,o in zip(predicted, original):
+# #     print(p, ' -> ', o)
+# ## Plot outputs
+# import matplotlib.pyplot as plt
+# fig, ax = plt.subplots()
+# ax.scatter(original, predicted, edgecolors=(0, 0, 0))
+# ax.plot([10, 80], [10, 80], 'k--', lw=4)
+# ax.set_xlabel('Measured')
+# ax.set_ylabel('Predicted')
+# plt.show()
+#
+# from sklearn.metrics import mean_absolute_error
+# print("Mean Squared Error", mean_absolute_error(original, predicted))
 
 
 

@@ -16,13 +16,42 @@ def extract_cluster_tofile(features_file=None):
     featuresfile = io.open(file=features_file, mode='w')
     allbrowsers = {}
     users_with_gender = users_collection.find({"gender": {"$ne": ""}})
+
+    ##  get browser features
+    dfeature1 = {}
+    dfeature2 = {}
+    dfeature3 = {}
+    for d in users_with_gender:
+        for visits in d.get("lastVisits"):
+            deviceinfo = visits.get("browser").split('(')[1].split(')')[0].split(';')
+            for dicount, di in enumerate(deviceinfo):
+                if dicount == 0:
+                    if di not in dfeature1.keys():
+                        dfeature1[di] = 0
+                elif dicount == 1:
+                    if di not in dfeature2.keys():
+                        dfeature2[di] = 0
+                elif dicount == 3:
+                    if di not in dfeature3.keys():
+                        dfeature3[di] = 0
+
+    users_with_gender = users_collection.find({"gender": {"$ne": ""}})
     for document in users_with_gender:
         gender = document.get("gender")
         clusters = document.get("clusters")
-        clusterscount = len(clusters)
+        clusterscount = 0
         weights1 = []
         weights2 = []
         timestamps = []
+        dfeature1t = dfeature1
+        dfeature2t = dfeature2
+        dfeature3t = dfeature3
+        for key in dfeature1t:
+            dfeature1t[key] = 0
+        for key in dfeature2t:
+            dfeature2t[key] = 0
+        for key in dfeature3t:
+            dfeature3t[key] = 0
         timedataweekday = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0, 14: 0,
                     15: 0,
                     16: 0, 17: 0, 18: 0, 19: 0, 20: 0, 21: 0, 22: 0, 23: 0}
@@ -44,15 +73,26 @@ def extract_cluster_tofile(features_file=None):
                    "Mobile": 0,
                    "iPod touch": 0,
                    "Android 6.0.1": 0,
+                   "Android 5.1.1": 0,
                    "Android 7.0": 0,
                    "Windows Phone 10.0": 0,
                    "Android 7.1.1": 0}
-        ## fill weights
-        for clusternum in range(clusterscount):
-            cluster = clusters[clusternum]
-            weights1.append(float(cluster.get("weight")))
-        if any(weights1):
-            weights1 = [float(i) / sum(weights1) for i in weights1]
+        anotherdevices = {"Mobile": 0,
+                          "iPhone": 0,
+                          "SAMSUNG": 0,
+                          "Windows": 0,
+                          "Linux": 0,
+                          "Mac OS": 0,
+                          "iPod": 0,
+                          "Tablet": 0,
+                          "Moto": 0,
+                          "LG": 0}
+        # ## fill weights
+        # for clusternum in range(clusterscount):
+        #     cluster = clusters[clusternum]
+        #     weights1.append(float(cluster.get("weight")))
+        # if any(weights1):
+        #     weights1 = [float(i) / sum(weights1) for i in weights1]
 
         # weights2.append(float(document.get("totalVisits")))
         weights2.append(float(document.get("rtlluVisits")))
@@ -107,17 +147,42 @@ def extract_cluster_tofile(features_file=None):
 
         ## browser info
         for visits in document.get("lastVisits"):
-            if visits.get("browser") not in allbrowsers:
-                allbrowsers[visits.get("browser")] = 1
-            elif visits.get("browser") in allbrowsers:
-                allbrowsers[visits.get("browser")] += 1
             b = visits.get("browser").split('(')[1].split(';')[0]
+
+            if visits.get("browser") in allbrowsers.keys():
+                allbrowsers[visits.get("browser")] += 1
+            else:
+                allbrowsers[visits.get("browser")] = 1
             if "Windows NT" in b:
                 devices["Windows NT"] += 1
             else:
-                devices[b] += 1
+                if b in devices.keys():
+                    devices[b] += 1
         devices = devices.values()
-        devices = [float(i) / sum(devices) for i in devices]
+        # devices = [float(i) / sum(devices) for i in devices]
+
+        ## dfeature
+        for visits in document.get("lastVisits"):
+            deviceinfo = visits.get("browser").split('(')[1].split(')')[0].split(';')
+            for dicount, di in enumerate(deviceinfo):
+                try:
+                    if di in dfeature1t.keys():
+                        dfeature1t[di] += 1
+                    elif di in dfeature2t.keys():
+                        dfeature2t[di] += 1
+                    elif di in dfeature3t.keys():
+                        dfeature3t[di] += 1
+                except:
+                    pass
+        dfeature1t = dfeature1t.values()
+        if any(dfeature1t):
+            dfeature1t = [float(i) / sum(dfeature1t) for i in dfeature1t]
+        dfeature2t = dfeature2t.values()
+        if any(dfeature2t):
+            dfeature2t = [float(i) / sum(dfeature2t) for i in dfeature2t]
+        dfeature3t = dfeature3t.values()
+        if any(dfeature3t):
+            dfeature3t = [float(i) / sum(dfeature3t) for i in dfeature3t]
 
         timespentinmin = {0: 0, 1: 0, 2: 0, 3: 0, 4: 0, 5: 0, 6: 0, 7: 0, 8: 0, 9: 0, 10: 0, 11: 0, 12: 0, 13: 0,
                           14: 0, 15: 0, 16: 0, 17: 0, 18: 0, 19: 0, 20: 0, 21: 0, 22: 0, 23: 0}
@@ -129,22 +194,23 @@ def extract_cluster_tofile(features_file=None):
                     timespentinmin[old.hour] += (totalsec / 60.0)
                 old = t
         timespentinmin = timespentinmin.values()
-        # if any(timespentinmin):
-        #     timespentinmin = [float(i) / sum(timespentinmin) for i in timespentinmin]
+        if any(timespentinmin):
+            timespentinmin = [float(i) / sum(timespentinmin) for i in timespentinmin]
 
         # towrite = gender + ',' + ','.join(map(str, weights1)) + ',' + ','.join(map(str, weights2)) + ',' + ','.join(
         #     map(str, weekday)) + ',' + ','.join(map(str, timedata)) + '\n'
         # towrite = gender + ',' + ','.join(map(str, weights1)) + ',' + ','.join(map(str, devices)) + '\n'
-        towrite = gender + ',' + ','.join(map(str, weekday)) + '\n'
+        # towrite = gender + ',' + ','.join(map(str, weekday)) + '\n'
         # towrite = gender + ',' + str(list(devices).index(max(devices))) + ',' + str(list(timedataweekday).index(max(timedataweekday))) + '\n'
-        if len(document.get("lastVisits")) > 5:
-            towrite = gender + ',' + ','.join(map(str, weights1)) + ',' + ','.join(map(str, devices)) + ',' + ','.join(map(str, timespentinmin)) + '\n'
-            featuresfile.write(towrite)
+        # if len(document.get("lastVisits")) > 5:
+        #     towrite = gender + ',' + ','.join(map(str, weights1)) + ',' + ','.join(map(str, devices)) + '\n'
+        #     # towrite = gender + ',' + ','.join(map(str, weights1)) + ',' + ','.join(map(str, dfeature2t)) + '\n'
+        #     featuresfile.write(towrite)
         # towrite = gender + ',' + ','.join(map(str, weights1)) + ',' + ','.join(map(str, devices)) + '\n'
         # featuresfile.write(towrite)
+    for k in allbrowsers.keys():
+        print(k, "->", allbrowsers[k])
     featuresfile.close()
-    for key, value in allbrowsers.items():
-        print(key, " --> ", value)
 
 
 features_file = "/tmp/rtleditus/genderpredictionfeatures2.dat"
@@ -168,7 +234,7 @@ extract_cluster_tofile(features_file=features_file)
 #
 # n = []
 # accuracy = []
-# for nfeatures in range(10, len(featurem[0])+1, 2):
+# for nfeatures in range(len(featurem[0]), len(featurem[0])+1):
 #     n.append(nfeatures)
 #     n_folds = 5
 #     # clf = ensemble.GradientBoostingClassifier(n_estimators=100)
